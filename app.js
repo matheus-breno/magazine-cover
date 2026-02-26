@@ -9,7 +9,7 @@ const UI = {
     fontPalette: document.getElementById("font-palette"),
     bgPalette: document.getElementById("bg-palette"),
     previewCanvas: document.getElementById("previewCanvas"),
-    previewCtx: document.getElementById("previewCanvas").getContext("2d")    
+    previewCtx: document.getElementById("previewCanvas").getContext("2d")
 };
 
 UI.cameraBtn = document.getElementById("cameraBtn");
@@ -19,17 +19,17 @@ UI.cameraContainer = document.getElementById("camera-container");
 
 UI.cameraBtn.onclick = async () => {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: "user" }, 
-            audio: false 
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user" },
+            audio: false
         });
-        
+
         UI.video.srcObject = stream;
-        
+
         // Show the camera UI and hide the initial camera button
         UI.cameraContainer.style.display = "block";
         UI.cameraBtn.style.display = "none";
-        
+
         updateProgress("Camera Live", 100);
     } catch (err) {
         console.error("Camera error: ", err);
@@ -42,18 +42,18 @@ UI.cameraBtn.onclick = async () => {
  */
 async function processCapturedFrame() {
     updateProgress("AI Processing...", 40);
-    
+
     // Since the image is already on UI.canvas, we pass the canvas to ColorThief
     // and run the U2Net logic exactly like the file upload does.
-    
+
     // --- [INSERT YOUR U2NET MASK LOGIC HERE] ---
     // (Use the same logic from your upload.onchange to generate the alpha mask)
-    
+
     // After mask is applied:
     generateUIColors(UI.canvas);
     pickRandomPhrase();
     renderMagazine();
-    
+
     updateProgress("Magazine Generated", 100);
     UI.cropBtn.disabled = false;
 }
@@ -140,16 +140,17 @@ function hslToHex(h, s, l) {
 
 function generateUIColors(sourceCanvas) {
     // 1. Extract 6 colors from the subject
-    const palette = colorThief.getPalette(sourceCanvas, 6);
+    const palette = colorThief.getPalette(sourceCanvas, 5);
+    const palette_bg = colorThief.getPalette(sourceCanvas, 6);
     const hexPalette = palette.map(rgb => rgbToHex(...rgb));
-    
+
     // 2. Calculate the "Magic" Unified Color once and STORE IT
     const magicColor = getUnifiedComplementaryColor(hexPalette);
     unifiedFontColor = magicColor; // Set as default
 
     // 3. Clear and Rebuild Font Palette
     UI.fontPalette.innerHTML = "";
-    
+
     // --- OPTION 1: THE MAGIC COLOR ---
     const magicSwatch = createSwatch(magicColor, () => {
         unifiedFontColor = magicColor; // Now it can return to exactly this color
@@ -162,13 +163,17 @@ function generateUIColors(sourceCanvas) {
 
     // --- OPTIONS 2-6: THE INVERTED VARIANTS ---
     // We skip the first palette color to avoid redundancy if it matches the magic logic
-    palette.slice(1).forEach((rgb) => {
-        const [h, s, l] = rgbToHsl(...rgb);
-        // We use your 180-degree inversion logic for these
-        const invertedOption = hslToHex((h + 180) % 360, Math.max(s, 75), 25);
-        
-        const swatch = createSwatch(invertedOption, () => {
-            unifiedFontColor = invertedOption;
+    palette.slice(0, 5).forEach((rgb) => {
+        // Restoring your original math:
+        const invR = 255 - rgb[0];
+        const invG = 255 - rgb[1];
+        const invB = 255 - rgb[2];
+
+        // Convert back to Hex for the swatch
+        const rgbHex = `#${((1 << 24) + (invR << 16) + (invG << 8) + invB).toString(16).slice(1)}`;
+
+        const swatch = createSwatch(rgbHex, () => {
+            unifiedFontColor = rgbHex;
             renderMagazine();
         });
         UI.fontPalette.appendChild(swatch);
@@ -176,16 +181,16 @@ function generateUIColors(sourceCanvas) {
 
     // 4. Background Palette (Pastel Tints)
     UI.bgPalette.innerHTML = "";
-    palette.forEach((rgb, i) => {
+    palette_bg.forEach((rgb, i) => {
         const [h, s, l] = rgbToHsl(...rgb);
         const tint = `hsl(${Math.round(h)}, ${Math.round(s * 0.5)}%, 94%)`;
         const bgSwatch = createSwatch(tint, () => {
             selectedColor = tint;
             renderMagazine();
         });
-        if (i === 0) { 
-            selectedColor = tint; 
-            bgSwatch.classList.add('active'); 
+        if (i === 0) {
+            selectedColor = tint;
+            bgSwatch.classList.add('active');
         }
         UI.bgPalette.appendChild(bgSwatch);
     });
@@ -306,7 +311,7 @@ function drawMagazineDesign(targetCanvas) {
 
     // Subtitle in Work Sans
     const subSize = Math.round(w * 0.024);
-    ctx.font = `400 ${subSize}px 'Work Sans', sans-serif`;
+    ctx.font = `600 ${subSize}px 'Work Sans', sans-serif`;
     wrapText(ctx, currentPhrases.subtitle, w / 2, curY + 15, maxWidth, subSize * 1.4);
 
     ctx.restore();
@@ -335,7 +340,7 @@ async function runAIWorkflow() {
     off.width = off.height = 320;
     const octx = off.getContext("2d");
     octx.drawImage(UI.canvas, 0, 0, 320, 320); // Source is now the canvas
-    
+
     const data = octx.getImageData(0, 0, 320, 320).data;
     const f = new Float32Array(3 * 320 * 320);
     for (let i = 0; i < 320 * 320; i++) {
@@ -377,7 +382,7 @@ async function processImage(src) {
         UI.canvas.width = img.width;
         UI.canvas.height = img.height;
         UI.ctx.drawImage(img, 0, 0);
-        
+
         // Call the shared workflow
         await runAIWorkflow();
     };
@@ -391,7 +396,7 @@ UI.captureBtn.onclick = async () => {
     UI.canvas.width = UI.video.videoWidth;
     UI.canvas.height = UI.video.videoHeight;
     UI.ctx.drawImage(UI.video, 0, 0);
-    
+
     // 2. Stop camera
     const stream = UI.video.srcObject;
     stream.getTracks().forEach(track => track.stop());

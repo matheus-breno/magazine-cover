@@ -65,3 +65,18 @@
     gap: 10px;
     margin-top: 20px;
 }
+
+.palette-grid {
+    display: flex;
+    justify-content: center;
+    flex-wrap: nowrap; /* Prevents 6 colors from jumping to a second row */
+    gap: 8px;
+    width: 100%;
+    margin-top: 10px;
+}
+
+.color-swatch {
+    flex-shrink: 0; /* Prevents circles from squishing on small screens */
+    width: 35px;
+    height: 35px;
+}
