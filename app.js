@@ -16,6 +16,7 @@ UI.cameraBtn = document.getElementById("cameraBtn");
 UI.video = document.getElementById("video");
 UI.captureBtn = document.getElementById("captureBtn");
 UI.cameraContainer = document.getElementById("camera-container");
+UI.cancelBtn = document.getElementById("cancelBtn");
 
 UI.cameraBtn.onclick = async () => {
     try {
@@ -35,6 +36,29 @@ UI.cameraBtn.onclick = async () => {
         console.error("Camera error: ", err);
         alert("Camera access denied or not available.");
     }
+};
+
+function stopCamera() {
+    const stream = UI.video.srcObject;
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+    UI.cameraContainer.style.display = "none";
+}
+
+UI.cancelBtn.onclick = stopCamera;
+
+UI.captureBtn.onclick = async () => {
+    // 1. Snapshot
+    UI.canvas.width = UI.video.videoWidth;
+    UI.canvas.height = UI.video.videoHeight;
+    UI.ctx.drawImage(UI.video, 0, 0);
+    
+    // 2. Cleanup
+    stopCamera();
+
+    // 3. Process
+    await runAIWorkflow();
 };
 
 /**
