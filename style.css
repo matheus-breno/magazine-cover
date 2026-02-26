@@ -1,236 +1,67 @@
-:root {
-  --primary: #111;
-  --accent: #0078d4;
-  --bg: #f8f9fa;
+.input-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
 }
 
-body {
-  font-family: 'Merriweather', serif; /* UI matches the magazine brand */
-  background-color: #f4f4f4;
-  background-color: var(--bg);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  margin: 0;
+.btn-input {
+    flex: 1;
+    background: #fff;
+    border: 2px solid #000;
+    padding: 15px;
+    font-weight: bold;
+    border-radius: 8px;
 }
 
-h1 {
-    font-weight: 900;
-    letter-spacing: -2px;
+.status-container {
+    margin: 20px 0;
 }
 
-.container {
-  background: white;
-  padding: 2rem;
-  border-radius: 24px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
-  width: 90%;
-  max-width: 650px;
-  text-align: center;
+#progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
 }
 
-/* Main Color Styling */
-.main-color-section {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 15px;
-  margin: 20px 0;
-  font-weight: bold;
-  font-size: 0.9rem;
+#progress-fill {
+    width: 0%;
+    height: 100%;
+    background: #000;
+    transition: width 0.3s;
 }
 
-.main-color-box {
-  width: 60px;
-  height: 30px;
-  border-radius: 6px;
-  border: 1px solid #ddd;
+.customizer-section {
+    text-align: left;
+    margin-bottom: 15px;
 }
 
-/* Debug Section */
-.debug-section {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 5px;
-  margin: 10px 0 20px 0;
-  padding: 10px;
-  background: #f0f0f0;
-  border-radius: 8px;
-  font-size: 9px;
-  font-weight: bold;
+.customizer-section label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: bold;
 }
 
-.debug-box {
-  height: 45px;
-  border-radius: 4px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  color: white;
-  text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.5);
-}
-
-.palette-label {
-  font-size: 0.7rem;
-  color: #888;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 5px;
-}
-
-.palette-display {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 20px;
+.palette-grid {
+    display: flex;
+    gap: 8px;
+    margin-top: 5px;
 }
 
 .color-swatch {
-  width: 45px;
-  height: 45px;
-  border-radius: 12px;
-  border: 3px solid #fff;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-  transition: 0.2s;
+    width: 35px;
+    height: 35px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 2px solid transparent;
 }
 
-.color-swatch.active {
-  transform: scale(1.1);
-  border-color: var(--accent);
-}
+.color-swatch.active { border-color: #000; }
 
-.canvas-wrapper {
-  background: #eee;
-  padding: 5px;
-  border-radius: 5px;
-  margin-bottom: 20px;
-  display: inline-block;
-}
-
-canvas {
-  max-width: 100%;
-  max-height: 40vh;
-  display: block;
-  background-size: 10px 10px;
-  background-image: linear-gradient(45deg, #e5e5e5 25%, transparent 25%), linear-gradient(-45deg, #e5e5e5 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e5e5 75%), linear-gradient(-45deg, transparent 75%, #e5e5e5 75%);
-}
-
-.btn-upload {
-  background: var(--accent);
-  color: white;
-  padding: 12px 24px;
-  border-radius: 50px;
-  cursor: pointer;
-  font-weight: 600;
-  display: inline-block;
-}
-
-.button-group {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-button {
-  padding: 14px;
-  border: none;
-  border-radius: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.btn-primary {
-  background: var(--primary);
-  color: white;
-}
-
-button:disabled {
-  opacity: 0.3;
-}
-
-.loading-spinner {
-  display: none;
-  margin: 10px auto;
-  width: 25px;
-  height: 25px;
-  border: 3px solid #f3f3f3;
-  border-top: 3px solid var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-/* ... Previous root and body styles ... */
-
-.debug-grid-container {
-  background: #f0f0f0;
-  padding: 10px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.debug-row {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-}
-
-.debug-box {
-  height: 50px;
-  border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  font-size: 9px;
-  font-weight: bold;
-  color: white;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.editor-layout {
+.action-footer {
     display: flex;
-    gap: 20px;
-    justify-content: center;
-    flex-wrap: wrap;
+    gap: 10px;
     margin-top: 20px;
-}
-
-.view-pane {
-    flex: 1;
-    min-width: 300px;
-}
-
-.label {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #888;
-    margin-bottom: 8px;
-}
-
-/* Force the preview to maintain A4 proportions visually */
-.preview-wrapper {
-    background: white;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-    border: 1px solid #ddd;
-    line-height: 0;
-}
-
-#previewCanvas {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 210 / 297; /* A4 Ratio */
 }

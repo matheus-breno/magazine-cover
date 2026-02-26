@@ -1,34 +1,135 @@
 const UI = {
     upload: document.getElementById("upload"),
+    cameraBtn: document.getElementById("cameraBtn"),
     canvas: document.getElementById("canvas"),
     ctx: document.getElementById("canvas").getContext("2d"),
-    downloadBtn: document.getElementById("download"),
     cropBtn: document.getElementById("cropA4"),
     statusText: document.getElementById("status"),
-    spinner: document.getElementById("spinner"),
-    paletteContainer: document.getElementById("palette"),
-    originalRow: document.getElementById("original-row"),
-    inverseRow: document.getElementById("inverse-row"),
-    fontColorPreview: document.getElementById("font-color-preview"),
+    progressFill: document.getElementById("progress-fill"),
+    fontPalette: document.getElementById("font-palette"),
+    bgPalette: document.getElementById("bg-palette"),
     previewCanvas: document.getElementById("previewCanvas"),
-    previewCtx: document.getElementById("previewCanvas").getContext("2d"),
-    mainColorPreview: document.getElementById("main-color-preview")
+    previewCtx: document.getElementById("previewCanvas").getContext("2d")    
 };
+
+UI.cameraBtn = document.getElementById("cameraBtn");
+UI.video = document.getElementById("video");
+UI.captureBtn = document.getElementById("captureBtn");
+UI.cameraContainer = document.getElementById("camera-container");
+
+UI.cameraBtn.onclick = async () => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: "user" }, 
+            audio: false 
+        });
+        
+        UI.video.srcObject = stream;
+        
+        // Show the camera UI and hide the initial camera button
+        UI.cameraContainer.style.display = "block";
+        UI.cameraBtn.style.display = "none";
+        
+        updateProgress("Camera Live", 100);
+    } catch (err) {
+        console.error("Camera error: ", err);
+        alert("Camera access denied or not available.");
+    }
+};
+
+UI.captureBtn.onclick = () => {
+    // Match canvas to video size
+    UI.canvas.width = UI.video.videoWidth;
+    UI.canvas.height = UI.video.videoHeight;
+    
+    // Snap the frame
+    UI.ctx.drawImage(UI.video, 0, 0);
+    
+    // Turn off camera stream
+    const stream = UI.video.srcObject;
+    stream.getTracks().forEach(track => track.stop());
+    
+    // Hide Camera UI, bring back the button
+    UI.cameraContainer.style.display = "none";
+    UI.cameraBtn.style.display = "block";
+    
+    // Run the AI processing on the captured frame
+    processImageFromCanvas();
+};
+
+/**
+ * Specifically for Camera: Starts processing from the existing UI.canvas
+ */
+async function processCapturedFrame() {
+    updateProgress("AI Processing...", 40);
+    
+    // Since the image is already on UI.canvas, we pass the canvas to ColorThief
+    // and run the U2Net logic exactly like the file upload does.
+    
+    // --- [INSERT YOUR U2NET MASK LOGIC HERE] ---
+    // (Use the same logic from your upload.onchange to generate the alpha mask)
+    
+    // After mask is applied:
+    generateUIColors(UI.canvas);
+    pickRandomPhrase();
+    renderMagazine();
+    
+    updateProgress("Magazine Generated", 100);
+    UI.cropBtn.disabled = false;
+}
+
 
 let session;
 let selectedColor = "#f0f0f0";
 let unifiedFontColor = "#000000";
+let magazinePhrases = [];
+let currentPhrases = { headline: "ESPERANDO", subtitle: "Abra uma imagem para começar" };
+
 const colorThief = new ColorThief();
 const MODEL_SIZE = 320;
 
+// --- INITIALIZATION ---
 async function init() {
+    updateProgress("Loading Phrases...", 10);
+    await loadPhrases();
     try {
+        updateProgress("Initializing AI Model...", 30);
         session = await ort.InferenceSession.create("./models/u2net.onnx", { executionProviders: ["wasm"] });
-        UI.statusText.innerText = "Model Ready. Upload an image.";
-    } catch (e) { UI.statusText.innerText = "Error loading model."; }
+        updateProgress("System Ready", 100);
+    } catch (e) {
+        updateProgress("Error loading model", 0);
+        console.error(e);
+    }
 }
 
-const rgbToHex = (r, g, b) => '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
+async function loadPhrases() {
+    try {
+        const response = await fetch('frases.txt');
+        const text = await response.text();
+        magazinePhrases = text.split('\n')
+            .filter(line => line.includes(';'))
+            .map(line => {
+                const [headline, subtitle] = line.split(';');
+                return { headline: headline.trim(), subtitle: subtitle.trim() };
+            });
+    } catch (e) { console.error("Could not load frases.txt"); }
+}
+
+function pickRandomPhrase() {
+    if (magazinePhrases.length > 0) {
+        currentPhrases = magazinePhrases[Math.floor(Math.random() * magazinePhrases.length)];
+    }
+}
+
+function updateProgress(text, percent) {
+    UI.statusText.innerText = text;
+    UI.progressFill.style.width = percent + "%";
+}
+
+// --- COLOR ENGINE ---
+function rgbToHex(r, g, b) {
+    return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
+}
 
 function rgbToHsl(r, g, b) {
     r /= 255; g /= 255; b /= 255;
@@ -46,221 +147,310 @@ function rgbToHsl(r, g, b) {
     return [h * 360, s * 100, l * 100];
 }
 
+function hslToHex(h, s, l) {
+    l /= 100;
+    const a = s * Math.min(l, 1 - l) / 100;
+    const f = n => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, '0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`.toUpperCase();
+}
+
+function generateUIColors(sourceCanvas) {
+    // 1. Extract 6 colors from the subject
+    const palette = colorThief.getPalette(sourceCanvas, 6);
+    const hexPalette = palette.map(rgb => rgbToHex(...rgb));
+    
+    // 2. Calculate the "Magic" Unified Color once and STORE IT
+    const magicColor = getUnifiedComplementaryColor(hexPalette);
+    unifiedFontColor = magicColor; // Set as default
+
+    // 3. Clear and Rebuild Font Palette
+    UI.fontPalette.innerHTML = "";
+    
+    // --- OPTION 1: THE MAGIC COLOR ---
+    const magicSwatch = createSwatch(magicColor, () => {
+        unifiedFontColor = magicColor; // Now it can return to exactly this color
+        renderMagazine();
+    });
+    magicSwatch.classList.add('active'); // Mark as default
+    // Add a small indicator or title so you know this is the "Auto" choice
+    magicSwatch.title = "Recommended Color";
+    UI.fontPalette.appendChild(magicSwatch);
+
+    // --- OPTIONS 2-6: THE INVERTED VARIANTS ---
+    // We skip the first palette color to avoid redundancy if it matches the magic logic
+    palette.slice(1).forEach((rgb) => {
+        const [h, s, l] = rgbToHsl(...rgb);
+        // We use your 180-degree inversion logic for these
+        const invertedOption = hslToHex((h + 180) % 360, Math.max(s, 75), 25);
+        
+        const swatch = createSwatch(invertedOption, () => {
+            unifiedFontColor = invertedOption;
+            renderMagazine();
+        });
+        UI.fontPalette.appendChild(swatch);
+    });
+
+    // 4. Background Palette (Pastel Tints)
+    UI.bgPalette.innerHTML = "";
+    palette.forEach((rgb, i) => {
+        const [h, s, l] = rgbToHsl(...rgb);
+        const tint = `hsl(${Math.round(h)}, ${Math.round(s * 0.5)}%, 94%)`;
+        const bgSwatch = createSwatch(tint, () => {
+            selectedColor = tint;
+            renderMagazine();
+        });
+        if (i === 0) { 
+            selectedColor = tint; 
+            bgSwatch.classList.add('active'); 
+        }
+        UI.bgPalette.appendChild(bgSwatch);
+    });
+
+    // Save for debugger
+    window.lastExtractedPalette = palette;
+}
+
 function getUnifiedComplementaryColor(hexColors) {
     let totalR = 0, totalG = 0, totalB = 0;
+
     hexColors.forEach(hex => {
         hex = hex.replace(/^#/, '');
         totalR += parseInt(hex.substring(0, 2), 16);
         totalG += parseInt(hex.substring(2, 4), 16);
         totalB += parseInt(hex.substring(4, 6), 16);
     });
-    let avgR = Math.round(totalR / hexColors.length);
-    let avgG = Math.round(totalG / hexColors.length);
-    let avgB = Math.round(totalB / hexColors.length);
-    return "#" + (255 - avgR).toString(16).padStart(2, '0') + (255 - avgG).toString(16).padStart(2, '0') + (255 - avgB).toString(16).padStart(2, '0').toUpperCase();
+
+    const avgR = totalR / hexColors.length;
+    const avgG = totalG / hexColors.length;
+    const avgB = totalB / hexColors.length;
+
+    let [h, s, l] = rgbToHsl(avgR, avgG, avgB);
+
+    // THE MAGIC STEPS:
+    h = (h + 180) % 360; // Rotate Hue
+    s = Math.max(s, 75);  // Boost Saturation
+    l = l > 50 ? 25 : 85; // High Contrast Readability
+
+    return hslToHex(h, s, l);
+}
+
+function createSwatch(color, callback) {
+    const div = document.createElement("div");
+    div.className = "color-swatch";
+    div.style.backgroundColor = color;
+    div.onclick = () => {
+        div.parentElement.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+        div.classList.add('active');
+        callback();
+    };
+    return div;
+}
+
+// --- TYPOGRAPHY ENGINE ---
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+    text = text.toUpperCase();
+    const words = text.split(' ');
+    let line = '';
+    let testY = y;
+    for (let n = 0; n < words.length; n++) {
+        let testLine = line + words[n] + ' ';
+        if (ctx.measureText(testLine).width > maxWidth && n > 0) {
+            ctx.fillText(line, x, testY);
+            line = words[n] + ' ';
+            testY += lineHeight;
+        } else { line = testLine; }
+    }
+    ctx.fillText(line, x, testY);
+    return testY;
+}
+
+function drawBalancedHeadline(ctx, text, x, y, maxWidth, lineHeight) {
+    text = text.toUpperCase();
+    const words = text.split(' ');
+    let midPoint = text.length / 2;
+    let charCount = 0, splitIndex = words.length - 1;
+    for (let i = 0; i < words.length; i++) {
+        charCount += words[i].length + 1;
+        if (charCount >= midPoint) { splitIndex = i; break; }
+    }
+    const line1 = words.slice(0, splitIndex + 1).join(' ').trim();
+    const line2 = words.slice(splitIndex + 1).join(' ').trim();
+    ctx.fillText(line1, x, y);
+    if (line2) ctx.fillText(line2, x, y + lineHeight);
+    return line2 ? y + (lineHeight * 2) : y + lineHeight;
+}
+
+// --- RENDER ENGINE ---
+function drawMagazineDesign(targetCanvas) {
+    const ctx = targetCanvas.getContext("2d");
+    const w = targetCanvas.width;
+    const h = targetCanvas.height;
+    const padding = w * 0.1;
+    const maxWidth = w - (padding * 2);
+
+    ctx.fillStyle = selectedColor;
+    ctx.fillRect(0, 0, w, h);
+
+    const scale = Math.max(w / UI.canvas.width, h / UI.canvas.height);
+    const drawW = UI.canvas.width * scale;
+    const drawH = UI.canvas.height * scale;
+    ctx.drawImage(UI.canvas, (w - drawW) / 2, (h - drawH) / 2, drawW, drawH);
+
+    ctx.save();
+    ctx.fillStyle = unifiedFontColor;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.shadowBlur = 0;
+
+    // Header Logo
+    ctx.font = `900 ${Math.round(w * 0.19)}px 'Merriweather', serif`;
+    ctx.fillText("Forbes", w / 2, h * 0.04);
+
+    // Balanced Headline
+    const headSize = Math.round(w * 0.05);
+    const headLH = headSize * 1.2;
+    ctx.font = `900 ${headSize}px 'Merriweather', serif`;
+    const txt = currentPhrases.headline.toUpperCase();
+    let curY = h * 0.84;
+
+    if (ctx.measureText(txt).width > maxWidth) {
+        curY = drawBalancedHeadline(ctx, txt, w / 2, curY, maxWidth, headLH);
+    } else {
+        ctx.fillText(txt, w / 2, curY);
+        curY += headLH;
+    }
+
+    // Subtitle in Work Sans
+    const subSize = Math.round(w * 0.024);
+    ctx.font = `400 ${subSize}px 'Work Sans', sans-serif`;
+    wrapText(ctx, currentPhrases.subtitle, w / 2, curY + 15, maxWidth, subSize * 1.4);
+
+    ctx.restore();
 }
 
 function renderMagazine() {
-    const pCanvas = UI.previewCanvas;
-    const pCtx = UI.previewCtx;
-    
-    // Set internal resolution (A4)
-    pCanvas.width = 1240; 
-    pCanvas.height = 1754;
-
-    // 1. Fill background with your pastel tint
-    pCtx.fillStyle = selectedColor;
-    pCtx.fillRect(0, 0, pCanvas.width, pCanvas.height);
-
-    // 2. CALCULATE COVER SCALE (Ensures no white space)
-    const scaleW = pCanvas.width / UI.canvas.width;
-    const scaleH = pCanvas.height / UI.canvas.height;
-    
-    // Use the larger scale to ensure the canvas is completely covered
-    const scale = Math.max(scaleW, scaleH);
-    
-    const drawW = UI.canvas.width * scale;
-    const drawH = UI.canvas.height * scale;
-
-    // Center the image so the crop is even on all sides
-    const offsetX = (pCanvas.width - drawW) / 2;
-    const offsetY = (pCanvas.height - drawH) / 2;
-
-    // 3. Draw the scaled image
-    pCtx.drawImage(UI.canvas, offsetX, offsetY, drawW, drawH);
-
-    // 4. Typography (Title)
-    pCtx.fillStyle = unifiedFontColor;
-    pCtx.font = "900 240px 'Merriweather', serif";
-    pCtx.textAlign = "center";
-    pCtx.textBaseline = "top";
-    pCtx.fillText("Forbes", pCanvas.width / 2, 80);
-
-    // 5. Typography (Headline)
-    pCtx.font = "900 50px 'Merriweather', serif";
-    pCtx.fillText("O HOMEM QUE MUDOU O MUNDO... PRA PIOR", pCanvas.width / 2, pCanvas.height - 250);
-    
-    pCtx.font = "italic 400 32px 'Merriweather', serif";
-    pCtx.fillText("Entenda como ele fez isso e porque ainda não está preso", pCanvas.width / 2, pCanvas.height - 180);
+    UI.previewCanvas.width = 1240;
+    UI.previewCanvas.height = 1754;
+    drawMagazineDesign(UI.previewCanvas);
+    // Auto-debug every time the magazine re-renders
+    debugState();
 }
 
+// --- IMAGE PROCESSING ---
 UI.upload.onchange = async (e) => {
     const file = e.target.files[0];
-    if (!file) return;
+    if (file) processImage(URL.createObjectURL(file));
+};
+
+async function processImage(src) {
     const img = new Image();
-    img.src = URL.createObjectURL(file);
+    img.src = src;
     img.onload = async () => {
-        UI.spinner.style.display = "block";
-        UI.statusText.innerText = "AI Processing: Removing Background...";
-        
-        UI.canvas.width = img.width; UI.canvas.height = img.height;
+        updateProgress("Removing Background...", 40);
+
+        UI.canvas.width = img.width;
+        UI.canvas.height = img.height;
         UI.ctx.drawImage(img, 0, 0);
 
-        // --- START AI BACKGROUND REMOVAL ---
-        const offscreen = document.createElement("canvas");
-        offscreen.width = MODEL_SIZE; offscreen.height = MODEL_SIZE;
-        const oCtx = offscreen.getContext("2d");
-        oCtx.drawImage(img, 0, 0, MODEL_SIZE, MODEL_SIZE);
-        
-        const imgData = oCtx.getImageData(0, 0, MODEL_SIZE, MODEL_SIZE).data;
-        const floatData = new Float32Array(3 * MODEL_SIZE * MODEL_SIZE);
-
-        // Normalize image for U2Net (Standard ImageNet mean/std)
-        for (let i = 0; i < MODEL_SIZE * MODEL_SIZE; i++) {
-            floatData[0 * 320 * 320 + i] = ((imgData[i * 4 + 0] / 255) - 0.485) / 0.229;
-            floatData[1 * 320 * 320 + i] = ((imgData[i * 4 + 1] / 255) - 0.456) / 0.224;
-            floatData[2 * 320 * 320 + i] = ((imgData[i * 4 + 2] / 255) - 0.406) / 0.225;
+        // 1. --- AI Background Removal ---
+        // (This part modifies UI.canvas to make the background transparent)
+        const off = document.createElement("canvas");
+        off.width = off.height = 320;
+        const octx = off.getContext("2d");
+        octx.drawImage(img, 0, 0, 320, 320);
+        const data = octx.getImageData(0, 0, 320, 320).data;
+        const f = new Float32Array(3 * 320 * 320);
+        for (let i = 0; i < 320 * 320; i++) {
+            f[0 * 320 * 320 + i] = ((data[i * 4 + 0] / 255) - 0.485) / 0.229;
+            f[1 * 320 * 320 + i] = ((data[i * 4 + 1] / 255) - 0.456) / 0.224;
+            f[2 * 320 * 320 + i] = ((data[i * 4 + 2] / 255) - 0.406) / 0.225;
         }
 
-        const inputTensor = new ort.Tensor("float32", floatData, [1, 3, 320, 320]);
-        const results = await session.run({ [session.inputNames[0]]: inputTensor });
+        const results = await session.run({ [session.inputNames[0]]: new ort.Tensor("float32", f, [1, 3, 320, 320]) });
         const mask = results[session.outputNames[0]].data;
 
-        const original = UI.ctx.getImageData(0, 0, UI.canvas.width, UI.canvas.height);
+        const orig = UI.ctx.getImageData(0, 0, UI.canvas.width, UI.canvas.height);
         for (let y = 0; y < UI.canvas.height; y++) {
             for (let x = 0; x < UI.canvas.width; x++) {
                 const idx = (y * UI.canvas.width + x) * 4;
-                const mX = (x * 319) / UI.canvas.width;
-                const mY = (y * 319) / UI.canvas.height;
-                const x0 = Math.floor(mX), y0 = Math.floor(mY), x1 = Math.min(x0+1, 319), y1 = Math.min(y0+1, 319);
-                const dx = mX - x0, dy = mY - y0;
-                
-                let alpha = mask[y0*320+x0]*(1-dx)*(1-dy) + mask[y0*320+x1]*dx*(1-dy) + mask[y1*320+x0]*(1-dx)*dy + mask[y1*320+x1]*dx*dy;
-                // Apply sigmoid-like sharpening to the mask
+                const mX = (x * 319) / UI.canvas.width, mY = (y * 319) / UI.canvas.height;
+                const x0 = Math.floor(mX), y0 = Math.floor(mY);
+                let alpha = mask[y0 * 320 + x0];
                 alpha = 1 / (1 + Math.exp(-12 * (alpha - 0.5)));
-                original.data[idx+3] = alpha * 255;
+                orig.data[idx + 3] = alpha * 255;
             }
         }
-        UI.ctx.putImageData(original, 0, 0);
-        // --- END AI BACKGROUND REMOVAL ---
+        UI.ctx.putImageData(orig, 0, 0);
 
-        UI.statusText.innerText = "Generating Palette...";
+        // 2. --- CRITICAL CHANGE: Extract palette from the PROCESSED canvas ---
+        // ColorThief can take a canvas element. By using UI.canvas here, 
+        // it ignores the transparent pixels and only looks at the person.
+        updateProgress("Extracting Subject Colors...", 85);
+        generateUIColors(UI.canvas);
 
-        const mainRgb = colorThief.getColor(img);
-        const palette = colorThief.getPalette(img, 5);
-        
-        const mainHex = rgbToHex(...mainRgb);
-        UI.mainColorPreview.style.backgroundColor = mainHex;
-
-        UI.originalRow.innerHTML = "";
-        UI.inverseRow.innerHTML = "";
-        palette.forEach(rgb => {
-            const hex = rgbToHex(...rgb);
-            const invR = 255 - rgb[0], invG = 255 - rgb[1], invB = 255 - rgb[2];
-            const invHex = rgbToHex(invR, invG, invB);
-
-            const oBox = document.createElement("div");
-            oBox.className = "debug-box"; oBox.style.backgroundColor = hex; oBox.innerHTML = `ORIG<br>${hex}`;
-            UI.originalRow.appendChild(oBox);
-
-            const iBox = document.createElement("div");
-            iBox.className = "debug-box"; iBox.style.backgroundColor = invHex; iBox.innerHTML = `INV<br>${invHex}`;
-            UI.inverseRow.appendChild(iBox);
-        });
-        
-        const hexPalette = palette.map(rgb => rgbToHex(...rgb));
-        unifiedFontColor = getUnifiedComplementaryColor(hexPalette);
-        UI.fontColorPreview.style.backgroundColor = unifiedFontColor;
-
-        UI.paletteContainer.innerHTML = "";
-        palette.forEach((rgb, i) => {
-            const [h, s, l] = rgbToHsl(...rgb);
-            const tint = `hsl(${Math.round(h)}, ${Math.round(s * 0.7)}%, 94%)`;
-            const swatch = document.createElement("div");
-            swatch.className = "color-swatch" + (i === 0 ? " active" : "");
-            swatch.style.backgroundColor = tint;
-            if (i === 0) selectedColor = tint;
-            swatch.onclick = () => {
-                selectedColor = tint;
-                document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
-                swatch.classList.add('active');
-                renderMagazine(); 
-            };
-            UI.paletteContainer.appendChild(swatch);
-        });
-                
-        UI.spinner.style.display = "none";
-        UI.statusText.innerText = "Processing Complete.";
-        UI.downloadBtn.disabled = UI.cropBtn.disabled = false;
+        pickRandomPhrase();
         renderMagazine();
+
+        updateProgress("Magazine Generated", 100);
+        UI.cropBtn.disabled = false;
     };
-};
+}
 
-// ... keep your UI.cropBtn.onclick and init() exactly as you had them ...
-
+// --- ACTIONS ---
 UI.cropBtn.onclick = () => {
-    const a4W = 2480; // 300 DPI Width
-    const a4H = 3508; // 300 DPI Height
-    const mag = document.createElement("canvas");
-    mag.width = a4W;
-    mag.height = a4H;
-    const mCtx = mag.getContext("2d");
-
-    // 1. Draw Background (in case of transparent edges)
-    mCtx.fillStyle = selectedColor;
-    mCtx.fillRect(0, 0, a4W, a4H);
-
-    // 2. CALCULATE FULL-BLEED (COVER) SCALE
-    // We scale the image so it perfectly fits the WIDTH of the A4 page
-    const scale = a4W / UI.canvas.width;
-    const drawW = UI.canvas.width * scale;
-    const drawH = UI.canvas.height * scale;
-
-    // Center vertically: if the scaled image is taller than A4, 
-    // it will crop the top/bottom equally.
-    const offsetX = 0; 
-    const offsetY = (a4H - drawH) / 2;
-
-    // 3. DRAW IMAGE (Full Bleed)
-    mCtx.drawImage(UI.canvas, offsetX, offsetY, drawW, drawH);
-
-    // 4. DRAW TITLE (VOGUE)
-    // Positioned at the top
-    mCtx.fillStyle = unifiedFontColor;
-    mCtx.font = "900 380px 'Merriweather', serif";
-    mCtx.textAlign = "center";
-    mCtx.textBaseline = "top";
-    mCtx.fillText("Forbes", a4W / 2, 150);
-
-    // 5. DRAW HEADLINE (At the Bottom)
-    // We use a slight shadow to ensure legibility over the image
-    mCtx.shadowColor = "rgba(0,0,0,0.3)";
-    mCtx.shadowBlur = 15;
-    
-    // Main Headline
-    mCtx.font = "900 130px 'Merriweather', serif";
-    mCtx.fillText("O HOMEM QUE MUDOU O MUNDO... PRA PIOR", a4W / 2, a4H - 500);
-
-    // Sub-headline
-    mCtx.shadowBlur = 0; // Disable shadow for smaller text
-    mCtx.font = "italic 400 65px 'Merriweather', serif";
-    mCtx.fillText("Entenda como ele fez isso e porque ainda não está preso", a4W / 2, a4H - 350);
-
-    // 6. EXPORT
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = 2480; exportCanvas.height = 3508;
+    drawMagazineDesign(exportCanvas);
     const link = document.createElement("a");
-    link.download = "magazine-a4-cover.png";
-    link.href = mag.toDataURL("image/png");
+    link.download = `magazine-cover-${Date.now()}.png`;
+    link.href = exportCanvas.toDataURL("image/png");
     link.click();
 };
+
+document.getElementById("nextPhrase").onclick = () => {
+    pickRandomPhrase();
+    renderMagazine();
+};
+
+function debugState() {
+    console.log("%c ⚡ MAGAZINE ENGINE DEBUG ⚡ ", "background: #000; color: #fff; font-weight: bold; padding: 4px;");
+
+    // 1. Core Variables Table
+    console.table({
+        "Background (selectedColor)": selectedColor,
+        "Font (unifiedFontColor)": unifiedFontColor,
+        "Headline": currentPhrases.headline,
+        "Subtitle": currentPhrases.subtitle
+    });
+
+    // 2. Color Analysis
+    const fontHsl = hexToHsl(unifiedFontColor);
+    const bgHsl = hexToHsl(selectedColor);
+
+    console.log(`%c Font HSL: h:${fontHsl[0]} s:${fontHsl[1]}% l:${fontHsl[2]}% `, `border-left: 5px solid ${unifiedFontColor}; padding-left: 10px;`);
+    console.log(`%c Back HSL: h:${bgHsl[0]} s:${bgHsl[1]}% l:${bgHsl[2]}% `, `border-left: 5px solid ${selectedColor}; padding-left: 10px;`);
+
+    // 3. Subject Palette Analysis (if colorThief has run)
+
+    console.log("Subject Extracted Palette:");
+    window.lastExtractedPalette.forEach((rgb, i) => {
+        const hex = rgbToHex(...rgb);
+        console.log(`%c Color ${i + 1}: ${hex} `, `background: ${hex}; color: ${hexToHsl(hex)[2] > 50 ? '#000' : '#fff'}; padding: 2px;`);
+    });
+
+}
+
+// Helper to convert hex back to HSL for debug reading
+function hexToHsl(hex) {
+    hex = hex.replace(/^#/, '');
+    let r = parseInt(hex.substring(0, 2), 16);
+    let g = parseInt(hex.substring(2, 4), 16);
+    let b = parseInt(hex.substring(4, 6), 16);
+    return rgbToHsl(r, g, b).map(val => Math.round(val));
+}
 
 init();

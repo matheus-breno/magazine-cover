@@ -1,68 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Magazine Pro - Editorial Edition</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.0/color-thief.umd.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,900;1,900&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Magazine Pro</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;900&family=Work+Sans:wght@400;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
+  <div class="app-container">
+    <div class="input-group">
+      <button class="btn-input" id="galleryBtn" onclick="document.getElementById('upload').click()">📂 Open from
+        Gallery</button>
+      <button class="btn-input" id="cameraBtn">📸 Take a Photo</button>
 
-<div class="container">
-    <header>
-    </header>
+      <input type="file" id="upload" accept="image/*" hidden>
 
-    <main>
-        <div class="upload-section">
-            <input type="file" id="upload" accept="image/*" hidden>
-            <label for="upload" class="btn-upload">Select Portrait</label>
-            <div id="spinner" class="loading-spinner"></div>
-            <p id="status" class="status">AI model is ready</p>
-        </div>
-
-        <div class="main-color-section">
-            <div id="main-color-preview" class="main-color-box"></div>
-            <span>Dominant Subject Color</span>
-        </div>
-        <div class="main-color-section">
-    <div id="font-color-preview" class="main-color-box" style="border: 2px solid #000;"></div>
-    <span>Unified Font Color (Title)</span>
-</div>
-        <div class="palette-label">Debug Palette (Original Top / Inverse Bottom):</div>
-        <div id="debug-palette" class="debug-grid-container">
-            <div id="original-row" class="debug-row"></div>
-            <div id="inverse-row" class="debug-row"></div>
-        </div>
-
-        <div class="palette-label">Select Magazine Background (Pastel Tints):</div>
-        <div id="palette" class="palette-display"></div>
-        
-        <div class="editor-layout">
-    <div class="view-pane">
-        <p class="label">Isolated Subject</p>
-        <div class="canvas-wrapper">
-            <canvas id="canvas"></canvas>
-        </div>
+      <div id="camera-container" style="display:none; width: 100%; margin-top: 15px;">
+        <video id="video" width="100%" autoplay playsinline style="border-radius: 8px; background: #000;"></video>
+        <button id="captureBtn" class="btn-input"
+          style="background: #ff4757; color: white; margin-top: 10px; width: 100%;">🔴 Capture Photo</button>
+      </div>
     </div>
 
-    <div class="view-pane">
-        <p class="label">A4 Magazine Preview</p>
-        <div class="preview-wrapper">
-            <canvas id="previewCanvas"></canvas>
-        </div>
+    <div class="status-container">
+      <div id="progress-bar">
+        <div id="progress-fill"></div>
+      </div>
+      <p id="status">Initializing Model...</p>
     </div>
-</div>
 
-        <div class="button-group">
-            <button id="download" class="btn-secondary" disabled>PNG Subject</button>
-            <button id="cropA4" class="btn-primary" disabled>Export A4 Magazine</button>
-        </div>
-    </main>
-</div>
+    <div class="customizer-section">
+      <label>Font Color (Picked vs Inverted Options)</label>
+      <div id="font-palette" class="palette-grid"></div>
+    </div>
 
-<script src="app.js" type="module"></script>
+    <div class="customizer-section">
+      <label>Background Tint</label>
+      <div id="bg-palette" class="palette-grid"></div>
+    </div>
+
+    <div class="magazine-layout">
+      <div class="preview-wrapper">
+        <canvas id="previewCanvas"></canvas>
+        <canvas id="canvas" style="display: none;"></canvas>
+      </div>
+    </div>
+
+    <div class="action-footer">
+      <button id="nextPhrase" class="btn-secondary">🔀 Random Headline</button>
+      <button id="cropA4" class="btn-export" disabled>📥 Download Cover</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.0/color-thief.umd.js"></script>
+  <script src="app.js"></script>
 </body>
+
 </html>
