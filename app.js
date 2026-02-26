@@ -37,26 +37,6 @@ UI.cameraBtn.onclick = async () => {
     }
 };
 
-UI.captureBtn.onclick = () => {
-    // Match canvas to video size
-    UI.canvas.width = UI.video.videoWidth;
-    UI.canvas.height = UI.video.videoHeight;
-    
-    // Snap the frame
-    UI.ctx.drawImage(UI.video, 0, 0);
-    
-    // Turn off camera stream
-    const stream = UI.video.srcObject;
-    stream.getTracks().forEach(track => track.stop());
-    
-    // Hide Camera UI, bring back the button
-    UI.cameraContainer.style.display = "none";
-    UI.cameraBtn.style.display = "block";
-    
-    // Run the AI processing on the captured frame
-    processImageFromCanvas();
-};
-
 /**
  * Specifically for Camera: Starts processing from the existing UI.canvas
  */
@@ -346,59 +326,83 @@ UI.upload.onchange = async (e) => {
     if (file) processImage(URL.createObjectURL(file));
 };
 
+async function runAIWorkflow() {
+    updateProgress("Removing Background...", 40);
+
+    // 1. --- AI Background Removal ---
+    // We use UI.canvas as the source for the 320x320 input
+    const off = document.createElement("canvas");
+    off.width = off.height = 320;
+    const octx = off.getContext("2d");
+    octx.drawImage(UI.canvas, 0, 0, 320, 320); // Source is now the canvas
+    
+    const data = octx.getImageData(0, 0, 320, 320).data;
+    const f = new Float32Array(3 * 320 * 320);
+    for (let i = 0; i < 320 * 320; i++) {
+        f[0 * 320 * 320 + i] = ((data[i * 4 + 0] / 255) - 0.485) / 0.229;
+        f[1 * 320 * 320 + i] = ((data[i * 4 + 1] / 255) - 0.456) / 0.224;
+        f[2 * 320 * 320 + i] = ((data[i * 4 + 2] / 255) - 0.406) / 0.225;
+    }
+
+    const results = await session.run({ [session.inputNames[0]]: new ort.Tensor("float32", f, [1, 3, 320, 320]) });
+    const mask = results[session.outputNames[0]].data;
+
+    const orig = UI.ctx.getImageData(0, 0, UI.canvas.width, UI.canvas.height);
+    for (let y = 0; y < UI.canvas.height; y++) {
+        for (let x = 0; x < UI.canvas.width; x++) {
+            const idx = (y * UI.canvas.width + x) * 4;
+            const mX = (x * 319) / UI.canvas.width, mY = (y * 319) / UI.canvas.height;
+            const x0 = Math.floor(mX), y0 = Math.floor(mY);
+            let alpha = mask[y0 * 320 + x0];
+            alpha = 1 / (1 + Math.exp(-12 * (alpha - 0.5)));
+            orig.data[idx + 3] = alpha * 255;
+        }
+    }
+    UI.ctx.putImageData(orig, 0, 0);
+
+    // 2. --- Styling & Rendering ---
+    updateProgress("Extracting Subject Colors...", 85);
+    generateUIColors(UI.canvas);
+    pickRandomPhrase();
+    renderMagazine();
+
+    updateProgress("Magazine Generated", 100);
+    UI.cropBtn.disabled = false;
+}
+
 async function processImage(src) {
     const img = new Image();
     img.src = src;
     img.onload = async () => {
-        updateProgress("Removing Background...", 40);
-
         UI.canvas.width = img.width;
         UI.canvas.height = img.height;
         UI.ctx.drawImage(img, 0, 0);
-
-        // 1. --- AI Background Removal ---
-        // (This part modifies UI.canvas to make the background transparent)
-        const off = document.createElement("canvas");
-        off.width = off.height = 320;
-        const octx = off.getContext("2d");
-        octx.drawImage(img, 0, 0, 320, 320);
-        const data = octx.getImageData(0, 0, 320, 320).data;
-        const f = new Float32Array(3 * 320 * 320);
-        for (let i = 0; i < 320 * 320; i++) {
-            f[0 * 320 * 320 + i] = ((data[i * 4 + 0] / 255) - 0.485) / 0.229;
-            f[1 * 320 * 320 + i] = ((data[i * 4 + 1] / 255) - 0.456) / 0.224;
-            f[2 * 320 * 320 + i] = ((data[i * 4 + 2] / 255) - 0.406) / 0.225;
-        }
-
-        const results = await session.run({ [session.inputNames[0]]: new ort.Tensor("float32", f, [1, 3, 320, 320]) });
-        const mask = results[session.outputNames[0]].data;
-
-        const orig = UI.ctx.getImageData(0, 0, UI.canvas.width, UI.canvas.height);
-        for (let y = 0; y < UI.canvas.height; y++) {
-            for (let x = 0; x < UI.canvas.width; x++) {
-                const idx = (y * UI.canvas.width + x) * 4;
-                const mX = (x * 319) / UI.canvas.width, mY = (y * 319) / UI.canvas.height;
-                const x0 = Math.floor(mX), y0 = Math.floor(mY);
-                let alpha = mask[y0 * 320 + x0];
-                alpha = 1 / (1 + Math.exp(-12 * (alpha - 0.5)));
-                orig.data[idx + 3] = alpha * 255;
-            }
-        }
-        UI.ctx.putImageData(orig, 0, 0);
-
-        // 2. --- CRITICAL CHANGE: Extract palette from the PROCESSED canvas ---
-        // ColorThief can take a canvas element. By using UI.canvas here, 
-        // it ignores the transparent pixels and only looks at the person.
-        updateProgress("Extracting Subject Colors...", 85);
-        generateUIColors(UI.canvas);
-
-        pickRandomPhrase();
-        renderMagazine();
-
-        updateProgress("Magazine Generated", 100);
-        UI.cropBtn.disabled = false;
+        
+        // Call the shared workflow
+        await runAIWorkflow();
     };
 }
+
+/**
+ * CAMERA CAPTURE HANDLER
+ */
+UI.captureBtn.onclick = async () => {
+    // 1. Snap photo from video to canvas
+    UI.canvas.width = UI.video.videoWidth;
+    UI.canvas.height = UI.video.videoHeight;
+    UI.ctx.drawImage(UI.video, 0, 0);
+    
+    // 2. Stop camera
+    const stream = UI.video.srcObject;
+    stream.getTracks().forEach(track => track.stop());
+    UI.cameraContainer.style.display = "none";
+    UI.cameraBtn.style.display = "block";
+
+    // 3. Call the shared workflow
+    await runAIWorkflow();
+};
+
+
 
 // --- ACTIONS ---
 UI.cropBtn.onclick = () => {
