@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Image Color Extractor</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; padding:20px; }
+    .btn { display:inline-block; padding:8px 12px; background:#0078d4; color:#fff; border-radius:4px; cursor:pointer; }
+    #image { max-width:300px; display:block; margin-top:12px; }
+    #palette { display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; }
+    .swatch { width:70px; height:70px; border:1px solid #ccc; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; }
+    .label { padding:4px 6px; border-radius:3px; font-size:11px; font-weight:600; }
+  </style>
+</head>
+<body>
+  <h1>Extract Colors from Image</h1>
+  <label class="btn">Choose Image <input id="upload" type="file" accept="image/*" style="display:none"></label>
+  <img id="image" crossorigin="anonymous" alt="">
+  <div id="palette" aria-live="polite"></div>
+
+  <script>
+    const upload = document.getElementById('upload');
+    const image = document.getElementById('image');
+    const paletteDiv = document.getElementById('palette');
+
+    function toHex([r,g,b]){ return '#' + [r,g,b].map(c=>c.toString(16).padStart(2,'0')).join(''); }
+    function textColorFor([r,g,b]){ const lum = 0.299*r + 0.587*g + 0.114*b; return lum > 186 ? '#000' : '#fff'; }
+    function getKeyFromRGB(r,g,b){ const rq = r >> 5, gq = g >> 5, bq = b >> 5; return (rq<<6) | (gq<<3) | bq; }
+
+    upload.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => { image.src = evt.target.result; };
+      reader.readAsDataURL(file);
+    });
+
+    image.addEventListener('load', () => {
+      const maxSize = 160;
+      const iw = image.naturalWidth || image.width;
+      const ih = image.naturalHeight || image.height;
+      if (!iw || !ih) return;
+      const w = Math.min(maxSize, iw);
+      const h = Math.max(1, Math.round(ih * w / iw));
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0,0,w,h);
+      ctx.drawImage(image, 0, 0, w, h);
+      const data = ctx.getImageData(0,0,w,h).data;
+
+      // Detect background color from sampled border pixels
+      const margin = Math.max(1, Math.floor(Math.min(w,h) * 0.05));
+      const borderFreq = new Map();
+      let borderTotal = 0;
+      function countBorderPixelAt(x,y){
+        const idx = (y * w + x) * 4;
+        const a = data[idx+3]; if (a === 0) return;
+        const r = data[idx], g = data[idx+1], b = data[idx+2];
+        const key = getKeyFromRGB(r,g,b);
+        borderFreq.set(key, (borderFreq.get(key)||0) + 1);
+        borderTotal++;
+      }
+      for (let y=0; y<margin; y++) for (let x=0; x<w; x++) countBorderPixelAt(x,y);
+      for (let y=h-margin; y<h; y++) for (let x=0; x<w; x++) countBorderPixelAt(x,y);
+      for (let y=margin; y<h-margin; y++){
+        for (let x=0; x<margin; x++) countBorderPixelAt(x,y);
+        for (let x=w-margin; x<w; x++) countBorderPixelAt(x,y);
+      }
+
+      let backgroundKey = null;
+      if (borderTotal > 0){
+        const sortedBorder = Array.from(borderFreq.entries()).sort((a,b)=>b[1]-a[1]);
+        const [topKey, topCount] = sortedBorder[0] || [null,0];
+        if (topCount / borderTotal >= 0.6) backgroundKey = topKey; // treat as background
+      }
+
+      const freq = new Map();
+      let total = 0;
+      for (let i=0; i<data.length; i+=4){
+        const a = data[i+3]; if (a === 0) continue;
+        const r = data[i], g = data[i+1], b = data[i+2];
+        const key = getKeyFromRGB(r,g,b);
+        if (backgroundKey !== null && key === backgroundKey) continue;
+        freq.set(key, (freq.get(key)||0) + 1);
+        total++;
+      }
+
+      const sorted = Array.from(freq.entries()).sort((a,b)=>b[1]-a[1]);
+      const top = sorted.slice(0,5).map(([key,count])=>{
+        const rq = (key>>6)&7, gq = (key>>3)&7, bq = key & 7;
+        const r = Math.min(255, rq*32 + 16), g = Math.min(255, gq*32 + 16), b = Math.min(255, bq*32 + 16);
+        return { rgb:[r,g,b], count };
+      });
+
+      paletteDiv.innerHTML = '';
+      top.forEach(({rgb,count}) => {
+        const sw = document.createElement('div'); sw.className = 'swatch';
+        sw.style.backgroundColor = `rgb(${rgb.join(',')})`;
+        const percent = total ? Math.round((count/total)*100) : 0;
+        const lbl = document.createElement('div'); lbl.className = 'label';
+        lbl.style.color = textColorFor(rgb);
+        lbl.textContent = `${toHex(rgb)} ${percent}%`;
+        sw.appendChild(lbl);
+        paletteDiv.appendChild(sw);
+      });
+
+      if (backgroundKey !== null){
+        const rq = (backgroundKey>>6)&7, gq = (backgroundKey>>3)&7, bq = backgroundKey & 7;
+        const br = Math.min(255, rq*32 + 16), bg = Math.min(255, gq*32 + 16), bb = Math.min(255, bq*32 + 16);
+        const note = document.createElement('div'); note.style.marginTop = '8px'; note.textContent = `Background color detected and excluded: ${toHex([br,bg,bb])}`;
+        paletteDiv.appendChild(note);
+      }
+    });
+  </script>
+</body>
+</html>

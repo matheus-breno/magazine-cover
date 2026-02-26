@@ -1,0 +1,7 @@
+# Ignore model binaries
+models/u2net.onnx
+
+# Node / editor temp
+node_modules/
+.vscode/
+*.log
