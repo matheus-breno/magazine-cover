@@ -1,5 +1,8 @@
 :root{--gap:12px;--swatch:35px;--btn-h:50px;--btn-radius:8px;--accent:#000;--muted:#e0e0e0;--panel-shadow:0 12px 30px rgba(0,0,0,.12)}
 
+/* Prevent 100% width + padding from causing horizontal overflow */
+*, *::before, *::after{box-sizing:border-box}
+
 /* Page layout */
 .app-container{box-sizing:border-box;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;width:100%;max-width:600px;margin:0 auto;padding:15px}
 .input-group,.status-container,.customizer-section,.action-footer{width:100%;display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:20px}
@@ -9,13 +12,15 @@
 .btn-secondary,.btn-export{width:100%;max-width:280px;height:var(--btn-h);display:flex;align-items:center;justify-content:center;margin:5px 0}
 
 /* Progress */
-.status-container{margin:20px 0}
+/* Reduce vertical gap between status and magazine preview */
+.status-container{margin:8px 0}
 #progress-bar{width:100%;height:4px;background:var(--muted);border-radius:4px;overflow:hidden}
 #progress-fill{width:0;height:100%;background:var(--accent);transition:width .28s ease}
 
 /* Palettes */
 .customizer-section{width:100%;text-align:left;margin-bottom:15px}
 .customizer-section label{font-size:12px;text-transform:uppercase;letter-spacing:1px;font-weight:700}
+.customizer-label{display:block;text-align:center;font-size:10px;color:#888;margin-bottom:12px;letter-spacing:2px;text-transform:uppercase;font-weight:700}
 .palette-grid{display:flex;gap:var(--gap);margin-top:5px;flex-wrap:wrap;justify-content:center;width:100%}
 .color-swatch{width:var(--swatch);height:var(--swatch);border-radius:4px;cursor:pointer;border:2px solid transparent;flex-shrink:0;box-sizing:border-box}
 .color-swatch.active{border-color:var(--accent)}
@@ -23,6 +28,54 @@
 /* Rows */
 .mobile-button-row,.palette-grid{display:flex;justify-content:center;flex-wrap:wrap;gap:var(--gap);width:100%}
 .action-footer{display:flex;gap:var(--gap);margin-top:20px;flex-wrap:wrap;justify-content:center}
+
+/* Make footer buttons match the input-group look (stacked/full-width on mobile) */
+.action-footer .mobile-button-row .btn-secondary,
+.action-footer .mobile-button-row .btn-export{
+  flex:1;
+  background:#fff;
+  border:1.5px solid #ececec; /* match .btn-input light border */
+  box-shadow:0 4px 12px rgba(0,0,0,0.03);
+  padding:15px;
+  font-weight:700;
+  border-radius:var(--btn-radius);
+  width:100%;
+  max-width:280px;
+  height:var(--btn-h);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin:5px 0;
+}
+
+/* Keep primary color for export while matching sizing */
+.action-footer .mobile-button-row .btn-export{background:var(--accent);color:#fff;border:none}
+
+/* Make the export button visually match other buttons by default */
+#cropA4{
+  background:#fff;
+  border:1.5px solid #ececec; /* thin light border to match other buttons */
+  color:inherit;
+  padding:15px;
+  height:var(--btn-h);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:var(--btn-radius);
+  width:100%;
+  max-width:280px;
+}
+
+#cropA4:disabled{
+  background:#f3f3f3;
+  color:#888;
+  cursor:not-allowed;
+  opacity:0.95;
+}
+
+/* Long-press tooltip */
+.longpress-tooltip{position:fixed;pointer-events:none;background:rgba(0,0,0,0.85);color:#fff;padding:6px 8px;border-radius:6px;font-size:12px;z-index:10000;transform:translate(-50%, -120%);white-space:nowrap;opacity:0;transition:opacity .12s}
+.longpress-tooltip.show{opacity:1}
 
 /* Camera */
 .camera-overlay{position:fixed;inset:0;background:#000;z-index:9999;display:flex;flex-direction:column}
@@ -33,13 +86,19 @@
 .btn-round{width:44px;height:44px;border-radius:50%;background:#444;color:#fff;border:none;font-size:20px}
 
 /* Magazine preview */
-.magazine-layout{width:100%;display:flex;justify-content:center;margin:20px 0}
-.preview-wrapper{width:97%;max-width:500px;background:#fff;box-shadow:0 10px 30px rgba(0,0,0,.2);border-radius:4px;line-height:0;overflow:hidden;aspect-ratio:210/297;display:flex;align-items:center;justify-content:center}
+.magazine-layout{width:100%;display:flex;justify-content:center;margin:6px 0;padding:2px 0 10px 0}
+.preview-wrapper{width:97%;max-width:460px;background:#fff;box-shadow:0 10px 30px rgba(0,0,0,.2);border-radius:4px;line-height:0;overflow:hidden;aspect-ratio:210/297;display:flex;align-items:center;justify-content:center}
 #previewCanvas{width:100%;height:auto;display:block}
 
 /* Responsive tweaks */
-@media (min-width:800px){.preview-wrapper{max-width:500px}.btn-input{max-width:320px}}
+@media (min-width:800px){.preview-wrapper{max-width:500px;margin:6px 0}.btn-input{max-width:320px}}
 @media (max-width:420px){:root{--swatch:40px}.btn-input{height:46px;padding:12px}}
+
+/* Icon sizing for SVG icons inside buttons */
+.icon{width:20px;height:20px;display:block}
+.btn-input .icon,.btn-secondary .icon,.btn-export .icon,.btn-round .icon{width:20px;height:20px}
+.btn-capture .icon{width:24px;height:24px}
+.btn-input svg,.btn-secondary svg,.btn-export svg{color:inherit;stroke:currentColor}
 
 :root {
   --gap: 16px;
@@ -108,7 +167,7 @@ body {
 
 /* 5. Magazine Preview (The Hero) */
 .magazine-layout {
-    margin: 32px 0;
+    margin: 2px 0;
 }
 
 .preview-wrapper {
@@ -150,17 +209,27 @@ body {
 
 /* 1. Card-style Sections */
 .app-container {
-  padding: 20px;
+  padding: 1px;
 }
 
-/* Give the interaction area a clean white base */
-.input-group, .customizer-section {
+/* Keep customizer sections as card-style, but make input-group transparent */
+.customizer-section {
   background: white;
   padding: 20px;
   border-radius: 20px;
   box-shadow: var(--card-shadow);
   margin-bottom: 20px;
   border: 1px solid rgba(0,0,0,0.03);
+}
+
+/* Input group should have no background so buttons appear on page (no card) */
+.input-group{
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  margin-bottom: 12px;
+  border: none;
 }
 
 /* 2. Professional Swatches */
@@ -192,11 +261,16 @@ body {
   transform: rotateX(2deg); /* Very subtle tilt for realism */
 }
 
+/* Tighten vertical spacing between customizer sections and the footer */
+.customizer-section{margin-bottom:8px !important}
+.action-footer{margin-top:8px !important}
+
 #status {
   font-family: 'Work Sans', sans-serif;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 10px;
+  font-weight: 700;
   color: #888;
   text-transform: uppercase;
-  letter-spacing: 1.5px;
+  letter-spacing: 2px;
+  margin-top: 10px;
 }

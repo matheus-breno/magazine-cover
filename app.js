@@ -94,14 +94,14 @@ const MODEL_SIZE = 320;
 
 // --- INITIALIZATION ---
 async function init() {
-    updateProgress("Loading Phrases...", 10);
+    updateProgress("Carregando frases...", 10);
     await loadPhrases();
     try {
-        updateProgress("Initializing AI Model...", 30);
+        updateProgress("Iniciando modelo de IA...", 30);
         session = await ort.InferenceSession.create("./models/u2net.onnx", { executionProviders: ["wasm"] });
-        updateProgress("System Ready", 100);
+        updateProgress("App pronto", 100);
     } catch (e) {
-        updateProgress("Error loading model", 0);
+        updateProgress("Erro ao carregar o modelo", 0);
         console.error(e);
     }
 }
@@ -116,7 +116,7 @@ async function loadPhrases() {
                 const [headline, subtitle] = line.split(';');
                 return { headline: headline.trim(), subtitle: subtitle.trim() };
             });
-    } catch (e) { console.error("Could not load frases.txt"); }
+    } catch (e) { console.error("Não foi possível carregar frases.txt"); }
 }
 
 function pickRandomPhrase() {
@@ -125,9 +125,13 @@ function pickRandomPhrase() {
     }
 }
 
-function updateProgress(text, percent) {
-    UI.statusText.innerText = text;
-    UI.progressFill.style.width = percent + "%";
+function updateProgress(text, percent = 0) {
+    // Ensure status text uses the customizer-label style and uppercase formatting
+    if (UI.statusText) {
+        UI.statusText.className = 'customizer-label';
+        UI.statusText.textContent = String(text).toUpperCase();
+    }
+    if (UI.progressFill) UI.progressFill.style.width = (percent || 0) + "%";
 }
 
 // --- COLOR ENGINE ---
@@ -182,7 +186,7 @@ function generateUIColors(sourceCanvas) {
     });
     magicSwatch.classList.add('active'); // Mark as default
     // Add a small indicator or title so you know this is the "Auto" choice
-    magicSwatch.title = "Recommended Color";
+    magicSwatch.title = "Cor recomendada";
     UI.fontPalette.appendChild(magicSwatch);
 
     // --- OPTIONS 2-6: THE INVERTED VARIANTS ---
@@ -356,7 +360,7 @@ UI.upload.onchange = async (e) => {
 };
 
 async function runAIWorkflow() {
-    updateProgress("Removing Background...", 40);
+    updateProgress("Removendo fundo...", 40);
 
     // 1. --- AI Background Removal ---
     // We use UI.canvas as the source for the 320x320 input
@@ -390,12 +394,12 @@ async function runAIWorkflow() {
     UI.ctx.putImageData(orig, 0, 0);
 
     // 2. --- Styling & Rendering ---
-    updateProgress("Extracting Subject Colors...", 85);
+    updateProgress("Extraindo cores da foto...", 85);
     generateUIColors(UI.canvas);
     pickRandomPhrase();
     renderMagazine();
 
-    updateProgress("Magazine Generated", 100);
+    updateProgress("Arte pronta pra impressão!", 100);
     UI.cropBtn.disabled = false;
 }
 
@@ -487,3 +491,54 @@ function hexToHsl(hex) {
 }
 
 init();
+
+// Long-press tooltip support for touch devices: shows aria-label on press-and-hold
+function setupLongPressTooltips() {
+    const buttons = document.querySelectorAll('button[aria-label]');
+    let timer = null;
+    let tooltip = null;
+
+    function createTooltip(text){
+        if (tooltip) tooltip.remove();
+        tooltip = document.createElement('div');
+        tooltip.className = 'longpress-tooltip';
+        tooltip.textContent = text;
+        document.body.appendChild(tooltip);
+        return tooltip;
+    }
+
+    function showFor(btn){
+        const text = btn.getAttribute('aria-label') || btn.title || '';
+        if (!text) return;
+        const t = createTooltip(text);
+        const r = btn.getBoundingClientRect();
+        const left = Math.round(r.left + r.width/2);
+        const top = Math.round(r.top) - 8; // place above
+        t.style.left = left + 'px';
+        t.style.top = top + 'px';
+        // small delay to allow layout then show
+        requestAnimationFrame(()=> t.classList.add('show'));
+    }
+
+    function hide(){
+        if (tooltip) { tooltip.classList.remove('show'); setTimeout(()=>{ if(tooltip) tooltip.remove(); tooltip = null; }, 120); }
+        if (timer) { clearTimeout(timer); timer = null; }
+    }
+
+    buttons.forEach(btn => {
+        btn.addEventListener('touchstart', (e) => {
+            timer = setTimeout(()=> showFor(btn), 600);
+        }, {passive:true});
+        btn.addEventListener('touchend', hide);
+        btn.addEventListener('touchcancel', hide);
+
+        // Desktop long-press (optional)
+        btn.addEventListener('mousedown', (e) => {
+            timer = setTimeout(()=> showFor(btn), 800);
+        });
+        btn.addEventListener('mouseup', hide);
+        btn.addEventListener('mouseleave', hide);
+    });
+}
+
+setupLongPressTooltips();

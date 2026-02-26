@@ -16,8 +16,12 @@
   <div class="app-container">
     <div class="input-group">
       <div class="mobile-button-row">
-        <button class="btn-input" onclick="document.getElementById('upload').click()">📂 Gallery</button>
-        <button class="btn-input" id="cameraBtn">📸 Camera</button>
+        <button class="btn-input" onclick="document.getElementById('upload').click()" aria-label="Gallery" title="Gallery">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h3l2 2h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+        </button>
+        <button class="btn-input" id="cameraBtn" aria-label="Camera" title="Camera">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+        </button>
       </div>
 
       <input type="file" id="upload" accept="image/*" hidden>
@@ -25,8 +29,10 @@
       <div id="camera-container" class="camera-overlay" style="display:none;">
         <video id="video" autoplay playsinline></video>
         <div class="camera-controls">
-          <button id="cancelBtn" class="btn-round">✕</button>
-          <button id="captureBtn" class="btn-capture">
+          <button id="cancelBtn" class="btn-round" aria-label="Cancel" title="Cancel">
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+          <button id="captureBtn" class="btn-capture" aria-label="Capture" title="Capture">
             <div class="inner-circle"></div>
           </button>
           <div class="spacer"></div>
@@ -38,9 +44,7 @@
       <div id="progress-bar">
         <div id="progress-fill"></div>
       </div>
-      <p id="status" style="font-size: 13px; font-weight: 500; color: #666; margin-top: 10px;">
-        ✨ Ready for your close-up
-      </p>
+      <p id="status" class="customizer-label">✨ Pronto para sua foto</p>
     </div>
 
     <div class="magazine-layout">
@@ -51,18 +55,24 @@
     </div>
 
     <div class="customizer-section">
-      <label>Font Color (Picked vs Inverted Options)</label>
+      <label>Cor da fonte</label>
       <div id="font-palette" class="palette-grid"></div>
     </div>
 
     <div class="customizer-section">
-      <label>Background Tint</label>
+      <label>Cor de fundo</label>
       <div id="bg-palette" class="palette-grid"></div>
     </div>
 
     <div class="action-footer">
-      <button id="nextPhrase" class="btn-secondary">🔀 Random Headline</button>
-      <button id="cropA4" class="btn-export" disabled>📥 Download Cover</button>
+      <div class="mobile-button-row">
+        <button id="nextPhrase" class="btn-secondary" aria-label="Random Headline" title="Random Headline">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line></svg>
+        </button>
+        <button id="cropA4" class="btn-export" disabled aria-label="Download Cover" title="Download Cover">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        </button>
+      </div>
     </div>
   </div>
 
