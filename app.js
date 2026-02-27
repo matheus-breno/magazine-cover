@@ -31,19 +31,23 @@ UI.cameraBtn.onclick = async () => {
         UI.cameraContainer.style.display = "block";
         UI.cameraBtn.style.display = "none";
 
-        updateProgress("Camera Live", 100);
+        updateProgress("Câmera funcional", 100);
     } catch (err) {
-        console.error("Camera error: ", err);
-        alert("Camera access denied or not available.");
+        console.error("Erro na câmera: ", err);
+        alert("Acesso à câmera negado ou indisponível.");
     }
 };
 
 function stopCamera() {
-    const stream = UI.video.srcObject;
+    const stream = UI.video && UI.video.srcObject;
     if (stream) {
         stream.getTracks().forEach(track => track.stop());
     }
+    // Clear the video element's source to fully release camera
+    if (UI.video) UI.video.srcObject = null;
+    // Hide camera overlay and show the camera-open button again
     UI.cameraContainer.style.display = "none";
+    if (UI.cameraBtn) UI.cameraBtn.style.display = "";
 }
 
 UI.cancelBtn.onclick = stopCamera;
@@ -65,7 +69,7 @@ UI.captureBtn.onclick = async () => {
  * Specifically for Camera: Starts processing from the existing UI.canvas
  */
 async function processCapturedFrame() {
-    updateProgress("AI Processing...", 40);
+    updateProgress("Processando imagem...", 40);
 
     // Since the image is already on UI.canvas, we pass the canvas to ColorThief
     // and run the U2Net logic exactly like the file upload does.
@@ -429,7 +433,7 @@ UI.captureBtn.onclick = async () => {
     const stream = UI.video.srcObject;
     stream.getTracks().forEach(track => track.stop());
     UI.cameraContainer.style.display = "none";
-    UI.cameraBtn.style.display = "block";
+    UI.cameraBtn.style.display = "";
 
     // 3. Call the shared workflow
     await runAIWorkflow();
